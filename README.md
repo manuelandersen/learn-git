@@ -60,3 +60,13 @@ git log
 ```
 
 to get a recor of all the changes and commits your code had over time. To exit this log just press `q`.
+
+# Making a new branch
+
+Sometimes you want to work on some new feature or try a different version of your code, but dont want to change the code until you know that the feature works. So you make a "copy" of your actual code and work in that copy. This is called a new branch. Your make a new one by doing:
+
+```
+git checkout -b new-branch
+```
+
+where `new-branch` is the name of the new branch you want to make.
