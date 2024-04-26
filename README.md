@@ -69,4 +69,8 @@ Sometimes you want to work on some new feature or try a different version of you
 git checkout -b new-branch
 ```
 
-where `new-branch` is the name of the new branch you want to make.
+where `new-branch` is the name of the new branch you want to make. Then you can add and commit changes to this new branch the exact same way that for `master`. For pushing the changes to this `new-branch` you do:
+
+```
+git push origin new-branch
+```
