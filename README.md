@@ -74,3 +74,32 @@ where `new-branch` is the name of the new branch you want to make. Then you can 
 ```
 git push origin new-branch
 ```
+
+# Pull request
+
+If you push sucesfully your new branch, your repository in github will give you the chance to `Open a pull request`. A pull request is a proposal to merge a set of changes from one branch into another.
+
+Once you open the pull request you will see something like this:
+
+![screenshot](imgs/pull-request.png)
+
+Here you can `Merge` the pull request, and all the commits from this `new-branch` will be added to the master branch. Once you make the merge, you will see something like this:
+
+![screenshot](imgs/merge-pull-request.png)
+
+And now you can safely delete the `new-branch` (because all of the commits from that branch is now in the master one).
+
+# Git pull
+
+Now that we just merge the `new-branch`, we can make:
+
+```
+git checkout master
+```
+to go back to the master branch, and type:
+
+```
+git pull origin master
+```
+
+to get the recents changes to our local machine.
