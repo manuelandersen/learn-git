@@ -1,0 +1,51 @@
+name: PR Commenter
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Get changed files
+      id: changed_files
+      run: |
+        git fetch origin +refs/heads/${{ github.head_ref }}:refs/remotes/origin/${{ github.head_ref }}
+        git diff --name-status origin/${{ github.base_ref }} origin/${{ github.head_ref }} > changes.txt
+        cat changes.txt
+
+    - name: Get line changes
+      id: line_changes
+      run: |
+        lines_added=0
+        lines_deleted=0
+        while read status file; do
+          if [ "$status" != "D" ]; then
+            diff_output=$(git diff origin/${{ github.base_ref }} origin/${{ github.head_ref }} -- $file)
+            added=$(echo "$diff_output" | grep "^+" | wc -l)
+            deleted=$(echo "$diff_output" | grep "^-" | wc -l)
+            lines_added=$((lines_added + added - 1))  # subtract 1 for the diff marker line
+            lines_deleted=$((lines_deleted + deleted - 1))  # subtract 1 for the diff marker line
+          fi
+        done < changes.txt
+        echo "Added lines: $lines_added"
+        echo "Deleted lines: $lines_deleted"
+        echo "::set-output name=added::${lines_added}"
+        echo "::set-output name=deleted::${lines_deleted}"
+
+    - name: Post comment
+      uses: peter-evans/create-or-update-comment@v1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        issue-number: ${{ github.event.pull_request.number }}
+        body: |
+          **Files changed**:
+          $(cat changes.txt | awk '{print $2}')
+
+          **Lines added**: ${{ steps.line_changes.outputs.added }}
+          **Lines deleted**: ${{ steps.line_changes.outputs.deleted }}
