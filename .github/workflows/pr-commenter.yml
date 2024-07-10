@@ -12,11 +12,20 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
+    - name: Get default branch
+      id: default_branch
+      run: |
+        echo "##[set-output name=branch;]$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')"
+
+    - name: Fetch changes
+      run: |
+        git fetch origin +refs/heads/${{ github.head_ref }}:refs/remotes/origin/${{ github.head_ref }}
+        git fetch origin +refs/heads/${{ steps.default_branch.outputs.branch }}:refs/remotes/origin/${{ steps.default_branch.outputs.branch }}
+
     - name: Get changed files
       id: changed_files
       run: |
-        git fetch origin +refs/heads/${{ github.head_ref }}:refs/remotes/origin/${{ github.head_ref }}
-        git diff --name-status origin/${{ github.base_ref }} origin/${{ github.head_ref }} > changes.txt
+        git diff --name-status origin/${{ steps.default_branch.outputs.branch }} origin/${{ github.head_ref }} > changes.txt
         cat changes.txt
 
     - name: Get line changes
@@ -26,7 +35,7 @@ jobs:
         lines_deleted=0
         while read status file; do
           if [ "$status" != "D" ]; then
-            diff_output=$(git diff origin/${{ github.base_ref }} origin/${{ github.head_ref }} -- $file)
+            diff_output=$(git diff origin/${{ steps.default_branch.outputs.branch }} origin/${{ github.head_ref }} -- $file)
             added=$(echo "$diff_output" | grep "^+" | wc -l)
             deleted=$(echo "$diff_output" | grep "^-" | wc -l)
             lines_added=$((lines_added + added - 1))  # subtract 1 for the diff marker line
