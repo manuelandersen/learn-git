@@ -1,53 +1,99 @@
-name: PR Comment
-
+name: Check Line Counts
 on:
-  pull_request:
-    types: [opened, synchronize]
+  pull_request_target:
+  
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
-  comment:
+  checkbranch:
+    name: Check PR Branch status
     runs-on: ubuntu-latest
+    outputs:
+      branchstat: ${{ steps.brstat.outputs.stat}}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
-
-      - name: Get list of changed and added files
-        id: changed-files
-        uses: actions/github-script@v6
+      - name: Check code from PR branch 
+        uses: actions/checkout@v4
         with:
-          script: |
-            const { data: files } = await github.rest.pulls.listFiles({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-            });
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Check whether branch is up-to-date
+        id: brstat
+        run: |
+          git remote add learn-git https://github.com/learn-git/learn-git  # Update repository name
+          git fetch learn-git master  # Update repository name
+          echo "${{ github.event.pull_request.head.sha }}"
+          git rev-list --left-right --count  learn-git/master...${{ github.event.pull_request.head.sha }} | awk '{print "Behind "$1" - Ahead "$2""}'
+          count=$(git rev-list --left-right --count  learn-git/master...${{ github.event.pull_request.head.sha }} | awk '{print $1}')
+          if [ $count -gt 0 ]
+          then
+            echo "Current branch is behind learn-git master branch!"  # Update repository name
+            echo "stat=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "stat=false" >> "$GITHUB_OUTPUT"
+          fi
 
-            const changedFiles = files.filter(file => file.status !== 'added').map(file => `- ${file.filename}`).join('\n');
-            const addedFiles = files.filter(file => file.status === 'added').map(file => `- ${file.filename}`).join('\n');
-
-            core.setOutput('changedFiles', changedFiles);
-            core.setOutput('addedFiles', addedFiles);
-
-      - name: Comment on the pull request
-        if: github.event_name == 'pull_request' && github.event.action == 'opened'
-        uses: actions/github-script@v6
+  szdiff:
+    name: Core Library Line Difference
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    needs: checkbranch
+    if: needs.checkbranch.outputs.branchstat == 'false'
+    steps:
+      - name: Checkout code from PR branch
+        uses: actions/checkout@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const changedFiles = `${{ steps.changed-files.outputs.changedFiles }}`;
-            const addedFiles = `${{ steps.changed-files.outputs.addedFiles }}`;
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+      - name: Checkout code from learn-git master  # Update repository name
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: master  # Update branch name if necessary
+          path: base
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Count Line Diff
+        run: |
+          pip install tabulate
+          BASE="$GITHUB_WORKSPACE/base"
+          PR="$GITHUB_WORKSPACE/pr"
+          cp "$BASE/sz.py" .
+          echo "loc_content<<EOF" >> "$GITHUB_ENV"
+          python sz.py "$BASE" "$PR" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+      - name: Comment Code Line Diff
+        continue-on-error: false
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ignore_empty: true
+          skip_unchanged: true
+          recreate: true
+          message: ${{ env.loc_content }}
 
-            let commentBody = '';
-            if (changedFiles) {
-              commentBody += `The following files have been changed:\n${changedFiles}\n\n`;
-            }
-            if (addedFiles) {
-              commentBody += `The following files have been added:\n${addedFiles}`;
-            }
+  rebase:
+    name: Core Library Line Difference
+    permissions:
+      pull-requests: write
+    runs-on: ubuntu-latest
+    needs: checkbranch
+    if: needs.checkbranch.outputs.branchstat == 'true'
+    steps:
+      - name: Comment Rebase
+        continue-on-error: false
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          skip_unchanged: true
+          recreate: true
+          message: |
+            This branch currently is behind learn-git master. The line count difference bot is disabled.
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: commentBody
-            });
