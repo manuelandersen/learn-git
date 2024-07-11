@@ -16,7 +16,7 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const { data: files } = await github.pulls.listFiles({
+            const { data: files } = await github.rest.pulls.listFiles({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.issue.number,
@@ -32,7 +32,8 @@ jobs:
             const files = `${{ steps.changed-files.outputs.files }}`;
             const commentBody = `The following files have been changed:\n${files}`;
             github.issues.createComment({
-              ...context.repo,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               issue_number: context.issue.number,
               body: commentBody
             });
