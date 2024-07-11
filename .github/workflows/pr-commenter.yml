@@ -6,23 +6,9 @@ on:
 
 jobs:
   comment:
+    if: github.event.comment.body == 'end of pr'
     runs-on: ubuntu-latest
     steps:
-      - name: Print event details
-        run: cat $GITHUB_EVENT_PATH
-
-      - name: Check if comment should trigger the bot
-        id: check-comment
-        run: |
-          is_pr=$(jq '.issue.pull_request != null' $GITHUB_EVENT_PATH)
-          comment_body=$(jq -r '.comment.body' $GITHUB_EVENT_PATH)
-          echo "is_pr=$is_pr" >> $GITHUB_ENV
-          echo "comment_body=$comment_body" >> $GITHUB_ENV
-
-      - name: Exit if not a PR or comment is not 'end of pr'
-        if: env.is_pr != 'true' || env.comment_body != 'end of pr'
-        run: echo "Conditions not met" && exit 1
-
       - name: Check out repository
         uses: actions/checkout@v3
 
