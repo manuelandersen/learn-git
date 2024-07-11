@@ -1,5 +1,3 @@
-name: PR Comment
-
 on:
   pull_request:
     types: [opened, synchronize]
@@ -22,35 +20,27 @@ jobs:
               pull_number: context.issue.number,
             });
 
-            // Separate changed and added files
-            const changedFiles = files.filter(file => file.status !== 'added');
-            const addedFiles = files.filter(file => file.status === 'added');
+            const changedFiles = files.filter(file => file.status !== 'added').map(file => - ${file.filename}).join('\n');
+            const addedFiles = files.filter(file => file.status === 'added').map(file => - ${file.filename}).join('\n');
 
-            // Calculate total lines changed
-            let totalLinesChanged = 0;
-            for (const file of changedFiles) {
-              totalLinesChanged += file.changes;
-            }
-
-            // Format the output
-            let commentBody = `| Name                        | Lines  | Diff  | Tokens/Line | Diff |\n`;
-            commentBody += `|-----------------------------|-------|-------|-------------|------|\n`;
-
-            for (const file of changedFiles) {
-              commentBody += `| ${file.filename.padEnd(28)} | ${file.changes.toString().padStart(5)} | ${file.changes > 0 ? '+' : '-'}${file.changes.toString().padStart(4)} | ${Math.round(file.additions / file.changes * 10) / 10} | ${file.deletions > 0 ? '-' : '+'}${Math.round(file.deletions / file.changes * 10) / 10} |\n`;
-            }
-
-            commentBody += `\nTotal lines changed: +${totalLinesChanged}`;
-
-            core.setOutput('commentBody', commentBody);
+            core.setOutput('changedFiles', changedFiles);
+            core.setOutput('addedFiles', addedFiles);
 
       - name: Comment on the pull request
-        if: steps.changed-files.outputs.commentBody != ''
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const commentBody = core.getInput('commentBody');
+            const changedFiles = ${{ steps.changed-files.outputs.changedFiles }};
+            const addedFiles = ${{ steps.changed-files.outputs.addedFiles }};
+
+            let commentBody = <!-- pr-comment-bot -->\n;
+            if (changedFiles) {
+              commentBody += The following files have been changed:\n${changedFiles}\n\n;
+            }
+            if (addedFiles) {
+              commentBody += The following files have been added:\n${addedFiles};
+            }
 
             // List comments on the pull request
             const { data: comments } = await github.rest.issues.listComments({
