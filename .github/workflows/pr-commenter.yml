@@ -36,7 +36,7 @@ jobs:
             const changedFiles = `${{ steps.changed-files.outputs.changedFiles }}`;
             const addedFiles = `${{ steps.changed-files.outputs.addedFiles }}`;
 
-            let commentBody = '';
+            let commentBody = `<!-- pr-comment-bot -->\n`;
             if (changedFiles) {
               commentBody += `The following files have been changed:\n${changedFiles}\n\n`;
             }
@@ -44,14 +44,15 @@ jobs:
               commentBody += `The following files have been added:\n${addedFiles}`;
             }
 
-            // Delete previous bot comments
+            // List comments on the pull request
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
 
-            const botComments = comments.filter(comment => comment.user.type === 'Bot' && comment.body.includes('The following files have been changed:') || comment.body.includes('The following files have been added:'));
+            // Find and delete previous bot comments
+            const botComments = comments.filter(comment => comment.body.startsWith('<!-- pr-comment-bot -->'));
 
             for (const comment of botComments) {
               await github.rest.issues.deleteComment({
