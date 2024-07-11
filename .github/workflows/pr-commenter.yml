@@ -45,10 +45,14 @@ jobs:
             core.setOutput('commentBody', commentBody);
 
       - name: Comment on the pull request
+        if: steps.changed-files.outputs.commentBody != ''
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const commentBody = core.getInput('commentBody');
+
+            // List comments on the pull request
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -71,5 +75,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: core.getInput('commentBody')
+              body: commentBody
             });
