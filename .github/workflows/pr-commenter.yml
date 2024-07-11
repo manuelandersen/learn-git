@@ -49,13 +49,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const commentBody = `
-| Name                        | Lines  | Diff  | Tokens/Line | Diff |
-|-----------------------------|-------|-------|-------------|------|
-${steps.changed-files.outputs.commentBody}
-`;
-
-            // List comments on the pull request
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -78,5 +71,5 @@ ${steps.changed-files.outputs.commentBody}
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: commentBody
+              body: core.getInput('commentBody')
             });
