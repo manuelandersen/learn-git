@@ -1,17 +1,32 @@
 name: PR Comment
 
 on:
-  pull_request:
-    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
 
 jobs:
   comment:
     runs-on: ubuntu-latest
     steps:
+      - name: Check if comment triggers the bot
+        id: check-comment
+        run: |
+          if [[ "${{ github.event.issue.pull_request }}" == "null" ]]; then
+            echo "Not a pull request comment, skipping."
+            exit 1
+          fi
+          if [[ "${{ github.event.comment.body }}" != "end of pr" ]]; then
+            echo "Comment does not match 'end of pr', skipping."
+            exit 1
+          fi
+          echo "Comment matches 'end of pr', continuing."
+
       - name: Check out repository
+        if: steps.check-comment.outputs.continue == 'true'
         uses: actions/checkout@v3
 
       - name: Get list of changed and added files
+        if: steps.check-comment.outputs.continue == 'true'
         id: changed-files
         uses: actions/github-script@v6
         with:
@@ -29,7 +44,7 @@ jobs:
             core.setOutput('addedFiles', addedFiles);
 
       - name: Comment on the pull request
-        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        if: steps.check-comment.outputs.continue == 'true'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -37,7 +52,7 @@ jobs:
             const changedFiles = `${{ steps.changed-files.outputs.changedFiles }}`;
             const addedFiles = `${{ steps.changed-files.outputs.addedFiles }}`;
 
-            let commentBody = '';
+            let commentBody = `<!-- pr-comment-bot -->\n`;
             if (changedFiles) {
               commentBody += `The following files have been changed:\n${changedFiles}\n\n`;
             }
@@ -45,6 +60,25 @@ jobs:
               commentBody += `The following files have been added:\n${addedFiles}`;
             }
 
+            // List comments on the pull request
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            // Find and delete previous bot comments
+            const botComments = comments.filter(comment => comment.body.startsWith('<!-- pr-comment-bot -->'));
+
+            for (const comment of botComments) {
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: comment.id,
+              });
+            }
+
+            // Create a new comment
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
