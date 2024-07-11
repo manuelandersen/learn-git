@@ -8,25 +8,20 @@ jobs:
   comment:
     runs-on: ubuntu-latest
     steps:
-      - name: Check if comment triggers the bot
+      - name: Check if the comment should trigger the bot
         id: check-comment
         run: |
-          if [[ "${{ github.event.issue.pull_request }}" == "null" ]]; then
-            echo "Not a pull request comment, skipping."
-            exit 1
-          fi
-          if [[ "${{ github.event.comment.body }}" != "end of pr" ]]; then
-            echo "Comment does not match 'end of pr', skipping."
-            exit 1
-          fi
-          echo "Comment matches 'end of pr', continuing."
+          echo "is_pr=$(jq '.issue.pull_request != null' $GITHUB_EVENT_PATH)" >> $GITHUB_ENV
+          echo "comment_body=$(jq -r '.comment.body' $GITHUB_EVENT_PATH)" >> $GITHUB_ENV
+
+      - name: Exit if not a PR or comment is not 'end of pr'
+        if: env.is_pr != 'true' || env.comment_body != 'end of pr'
+        run: exit 1
 
       - name: Check out repository
-        if: steps.check-comment.outputs.continue == 'true'
         uses: actions/checkout@v3
 
       - name: Get list of changed and added files
-        if: steps.check-comment.outputs.continue == 'true'
         id: changed-files
         uses: actions/github-script@v6
         with:
@@ -44,7 +39,6 @@ jobs:
             core.setOutput('addedFiles', addedFiles);
 
       - name: Comment on the pull request
-        if: steps.check-comment.outputs.continue == 'true'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
