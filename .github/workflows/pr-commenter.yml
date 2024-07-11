@@ -12,18 +12,25 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Get list of changed files
-        id: files
-        run: |
-          files=$(jq -r '.pull_request.filenames | join("\n")' "$GITHUB_EVENT_PATH")
-          echo "::set-output name=files::$files"
+        id: changed-files
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: files } = await github.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            const fileList = files.map(file => `- ${file.filename}`).join('\n');
+            core.setOutput('files', fileList);
 
       - name: Comment on the pull request
         uses: actions/github-script@v6
         with:
           script: |
-            const files = `${{ steps.files.outputs.files }}`;
-            const lines = files.split("\n").map(file => `- ${file}`).join("\n");
-            const commentBody = `The following files have been changed:\n${lines}`;
+            const files = `${{ steps.changed-files.outputs.files }}`;
+            const commentBody = `The following files have been changed:\n${files}`;
             github.issues.createComment({
               ...context.repo,
               issue_number: context.issue.number,
